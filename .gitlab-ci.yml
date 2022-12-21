@@ -1,0 +1,58 @@
+image: maven:3.6.3-jdk-11
+
+stages:
+  - linting
+  - versioning
+  - build
+  - deploy
+  
+variables:
+  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode -Dmaven.repo.local=~/.m2/repository"
+  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+
+cache:
+  key: $CI_COMMIT_REF_SLUG
+  paths:
+    - .m2/repository
+    - /target
+  policy: pull-push
+
+linting:
+  stage: linting
+
+  tags:
+    - indicesqa  
+    
+  script:
+    - mvn $MAVEN_CLI_OPTS spotbugs:check 
+    
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    policy: pull-push
+    paths:
+      - .m2/repository
+
+build:
+  stage: build
+  
+  dependencies:
+    - linting
+
+  before_script:
+  
+    - if [ "$CI_COMMIT_REF_NAME" == "master" ]; then mvn validate -Dminor; else mvn validate -Dpatch; fi
+    
+  tags:
+    - indicesqa  
+
+  script:
+    - mvn deploy $MAVEN_CLI_OPTS -Dmaven.test.skip=true
+    
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - .m2/repository
+      - /target
+    policy: pull-push
+
+
